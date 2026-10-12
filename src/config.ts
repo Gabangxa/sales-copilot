@@ -35,6 +35,11 @@ export interface AppConfig {
   taskOwnerFilter: "us" | "all";
   appApiKey?: string;
   port: number;
+  transcribe: {
+    provider: "deepgram" | "openai";
+    deepgram: { apiKey?: string; model: string; language: string };
+    openai: { apiKey?: string; model: string };
+  };
 }
 
 function parseJsonMap(raw: string | undefined, label: string): Record<string, string> {
@@ -75,5 +80,17 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     taskOwnerFilter: env.TASK_OWNER_FILTER === "all" ? "all" : "us",
     appApiKey: env.APP_API_KEY,
     port: Number(env.PORT ?? 3000),
+    transcribe: {
+      provider: env.TRANSCRIBE_PROVIDER?.toLowerCase() === "openai" ? "openai" : "deepgram",
+      deepgram: {
+        apiKey: env.DEEPGRAM_API_KEY,
+        model: env.DEEPGRAM_MODEL || "nova-3",
+        language: env.DEEPGRAM_LANGUAGE || "en",
+      },
+      openai: {
+        apiKey: env.OPENAI_API_KEY,
+        model: env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe-diarize",
+      },
+    },
   };
 }

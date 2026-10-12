@@ -9,7 +9,15 @@ export interface ExtractOptions {
   sellerCompany?: string;
   /** Extra context the rep wants considered, e.g. "Existing client, renewal due in March". */
   context?: string;
+  /** "transcript" when the input is a call transcript (from audio or caption files) rather than typed notes. */
+  inputKind?: "notes" | "transcript";
 }
+
+export const TRANSCRIPT_GUIDANCE = `This is a call transcript, not typed notes:
+- Speaker labels may be generic ("Speaker 1") or come from the meeting software. Work out who is the seller and who is the client from what they say, and use real names when they are spoken.
+- Ignore small talk, filler words and false starts. Capture commitments, numbers and decisions.
+- Speech-to-text can mishear names, company names and figures. If an important number or name looks doubtful, record it as heard and add a line to openQuestions asking to confirm it.
+- Only treat something as a next step if a person actually agreed to do it.`;
 
 export const EXTRACTION_SYSTEM_PROMPT = `You are a meticulous sales operations analyst. You turn raw call notes or transcripts into a structured CRM record.
 
@@ -32,7 +40,9 @@ export function buildExtractionPrompt(notes: string, opts: ExtractOptions = {}):
     seller ? `Seller ("us"): ${seller}` : `Seller ("us"): the person who wrote these notes`,
   ];
   if (opts.context) lines.push(`Additional context from the rep: ${opts.context}`);
-  lines.push("", "<call_notes>", notes.trim(), "</call_notes>", "", "Extract the CRM record by calling record_call.");
+  const tag = opts.inputKind === "transcript" ? "call_transcript" : "call_notes";
+  if (opts.inputKind === "transcript") lines.push("", TRANSCRIPT_GUIDANCE);
+  lines.push("", `<${tag}>`, notes.trim(), `</${tag}>`, "", "Extract the CRM record by calling record_call.");
   return lines.join("\n");
 }
 

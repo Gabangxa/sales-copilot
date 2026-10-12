@@ -1,6 +1,6 @@
 {
   "name": "sales-copilot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Turn sales call notes into CRM updates and draft follow-up emails with Claude.",
   "type": "module",
   "license": "MIT",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
     "commander": "^15.0.0",
+    "mammoth": "^1.8.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

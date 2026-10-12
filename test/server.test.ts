@@ -9,7 +9,16 @@ const llm = new FakeLlm({
   save_drafts: { drafts: [{ label: "Recap", subject: "Next steps", body: "Hi Thandi,\n\nThank you.\n\nSox" }] },
 });
 const cfg = getConfig({ CRM: "none", APP_API_KEY: "secret" } as NodeJS.ProcessEnv);
-const server = createApp(cfg, () => llm);
+const server = createApp(
+  cfg,
+  () => llm,
+  () => ({
+    name: "fake",
+    async transcribe(a) {
+      return { source: "fake", segments: [{ speaker: "Speaker 1", start: 0, end: 2, text: `Heard ${a.data.byteLength} bytes from ${a.filename}` }] };
+    },
+  }),
+);
 let base = "";
 
 beforeAll(async () => {
@@ -55,5 +64,30 @@ describe("HTTP API", () => {
     expect(json.drafts[0].subject).toBe("Next steps");
     expect(json.eml[0]).toContain("Subject: Next steps");
     expect(llm.calls.slice(before).map((c) => c.toolName)).toEqual(["save_drafts"]);
+  });
+
+  it("transcribes a raw audio upload, then extracts and drafts in one call", async () => {
+    const before = llm.calls.length;
+    const res = await fetch(`${base}/api/transcribe?filename=kestrel.m4a&speakers=Speaker%201%3DSox&notes=1&followup=1`, {
+      method: "POST",
+      headers: { "Content-Type": "audio/mp4", Authorization: "Bearer secret" },
+      body: new Uint8Array(1234),
+    });
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.transcript).toBe("[00:00] Sox: Heard 1234 bytes from kestrel.m4a");
+    expect(json.extraction.account.companyName).toBe("Kestrel Foods");
+    expect(json.drafts).toHaveLength(1);
+    const extractCall = llm.calls.slice(before).find((c) => c.toolName === "record_call")!;
+    expect(extractCall.user).toContain("<call_transcript>");
+  });
+
+  it("rejects non-audio uploads", async () => {
+    const res = await fetch(`${base}/api/transcribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer secret" },
+      body: "{}",
+    });
+    expect(res.status).toBe(415);
   });
 });

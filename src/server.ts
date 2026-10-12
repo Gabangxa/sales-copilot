@@ -4,8 +4,22 @@ import { getConfig, loadDotEnv, type AppConfig, type CrmName } from "./config.js
 import { AnthropicLlm, type LlmClient } from "./llm.js";
 import { followUp, notesToCrm } from "./pipeline.js";
 import { toEml } from "./followup/draft.js";
+import { AUDIO_TYPES, createTranscriber, formatTranscript, type Transcriber } from "./transcribe/index.js";
+import { parseSpeakerMap } from "./transcribe/format.js";
 
 const MAX_BODY_BYTES = 512 * 1024;
+const MAX_AUDIO_BYTES = 200 * 1024 * 1024;
+
+async function readRaw(req: IncomingMessage, limit: number): Promise<Uint8Array<ArrayBuffer>> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > limit) throw new HttpError(413, `Upload too large (limit ${Math.round(limit / 1024 / 1024)} MB)`);
+    chunks.push(chunk as Buffer);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
+}
 
 async function readJson(req: IncomingMessage): Promise<Record<string, any>> {
   const chunks: Buffer[] = [];
@@ -47,7 +61,11 @@ function authorised(req: IncomingMessage, key?: string): boolean {
 
 const CRMS = ["twenty", "hubspot", "file", "none"];
 
-export function createApp(cfg: AppConfig, llmFactory: () => LlmClient = () => new AnthropicLlm(cfg.anthropicApiKey, cfg.model)) {
+export function createApp(
+  cfg: AppConfig,
+  llmFactory: () => LlmClient = () => new AnthropicLlm(cfg.anthropicApiKey, cfg.model),
+  transcriberFactory: () => Transcriber = () => createTranscriber(cfg),
+) {
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
@@ -62,7 +80,7 @@ export function createApp(cfg: AppConfig, llmFactory: () => LlmClient = () => ne
         const result = await notesToCrm(llmFactory(), cfg, {
           notes: body.notes,
           crm: body.crm as CrmName | undefined,
-          extract: { meetingDate: body.meetingDate, context: body.context },
+          extract: { meetingDate: body.meetingDate, context: body.context, inputKind: body.transcript ? "transcript" : "notes" },
           push: {
             dealId: body.dealId,
             companyId: body.companyId,
@@ -80,7 +98,7 @@ export function createApp(cfg: AppConfig, llmFactory: () => LlmClient = () => ne
         const result = await followUp(llmFactory(), cfg, {
           notes: body.notes,
           extraction: body.extraction,
-          extract: { meetingDate: body.meetingDate },
+          extract: { meetingDate: body.meetingDate, inputKind: body.transcript ? "transcript" : "notes" },
           draft: {
             tone: body.tone,
             variants: body.variants,
@@ -91,6 +109,43 @@ export function createApp(cfg: AppConfig, llmFactory: () => LlmClient = () => ne
           },
         });
         return send(res, 200, { ...result, eml: result.drafts.map((d) => toEml(d, cfg.sender.name)) });
+      }
+
+      if (url.pathname === "/api/transcribe") {
+        // Raw audio body. Query: filename, speakers, notes=1 (extract a record), followup=1, crm, dryRun, meetingDate.
+        const q = url.searchParams;
+        const filename = q.get("filename") ?? "call.m4a";
+        const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+        const mimeType = String(req.headers["content-type"] ?? "").split(";")[0] || AUDIO_TYPES[ext] || "";
+        if (!mimeType.startsWith("audio/") && !mimeType.startsWith("video/")) {
+          throw new HttpError(415, "Send the recording as the raw request body with an audio/* Content-Type");
+        }
+        const data = await readRaw(req, MAX_AUDIO_BYTES);
+        if (!data.byteLength) throw new HttpError(400, "Empty upload");
+        const transcript = await transcriberFactory().transcribe({ data, filename, mimeType });
+        const text = formatTranscript(transcript, parseSpeakerMap(q.get("speakers") ?? undefined));
+        const out: Record<string, unknown> = { transcript: text, segments: transcript.segments, durationSec: transcript.durationSec };
+
+        const crmName = q.get("crm") ?? undefined;
+        if (crmName !== undefined && !CRMS.includes(crmName)) throw new HttpError(400, `crm must be one of ${CRMS.join(", ")}`);
+        const extract = { meetingDate: q.get("meetingDate") ?? undefined, inputKind: "transcript" as const };
+        if (q.get("notes") === "1" || q.get("followup") === "1") {
+          const llm = llmFactory();
+          const r = await notesToCrm(llm, cfg, {
+            notes: text,
+            crm: (q.get("notes") === "1" ? crmName : "none") as CrmName | undefined,
+            extract,
+            push: { dryRun: q.get("dryRun") === "1" },
+          });
+          out.extraction = r.extraction;
+          if (q.get("notes") === "1") out.crm = r.crm;
+          if (q.get("followup") === "1") {
+            const f = await followUp(llm, cfg, { extraction: r.extraction, draft: { tone: (q.get("tone") as any) ?? undefined } });
+            out.drafts = f.drafts;
+            out.eml = f.drafts.map((d) => toEml(d, cfg.sender.name));
+          }
+        }
+        return send(res, 200, out);
       }
 
       throw new HttpError(404, "Not found");

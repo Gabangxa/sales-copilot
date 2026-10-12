@@ -2,7 +2,7 @@
 
 Two small tools for salespeople, powered by Claude:
 
-1. **Call notes to CRM**: paste rough call notes or a transcript, get a clean structured record (summary, attendees, next steps with owners and dates, objections, deal stage, commercial details), and push it to **Twenty**, **HubSpot**, or local files. Our next steps become CRM tasks.
+1. **Call notes to CRM**: give it rough call notes, a meeting transcript, or the **call recording itself**, get a clean structured record (summary, attendees, next steps with owners and dates, objections, deal stage, commercial details), and push it to **Twenty**, **HubSpot**, or local files. Our next steps become CRM tasks.
 2. **Follow-up email drafter**: turns the same record into a follow-up email in your own voice, with the agreed next steps and one clear call to action. Saves `.md` and `.eml` drafts you can open in your mail client.
 
 Both work from the command line or as a small HTTP API you can deploy (Railway, Render, Fly, anywhere Node runs).
@@ -24,9 +24,48 @@ node dist/cli.js followup examples/sample-call.txt --tone warm
 
 # Or both in one pass
 node dist/cli.js notes examples/sample-call.txt --followup
+
+# Straight from a recording (needs DEEPGRAM_API_KEY or OPENAI_API_KEY)
+node dist/cli.js notes ~/Recordings/kestrel-call.m4a --followup --speakers "Speaker 1=Sox,Speaker 2=Thandi"
 ```
 
 During development you can skip the build: `npm run dev -- notes examples/sample-call.txt`.
+
+## Recordings and transcripts
+
+Every command accepts any of these, detected by file extension:
+
+| Input | What happens |
+|---|---|
+| Notes: `.txt`, `.md`, or pasted on stdin | Read as typed notes |
+| Recording: `.m4a` `.mp3` `.wav` `.mp4` `.webm` `.ogg` `.flac` `.aac` | Transcribed with speaker labels, saved to `OUT_DIR/<name>-transcript.txt`, then processed |
+| Captions: `.vtt` `.srt` (Teams, Zoom, Google Meet) | Parsed into speaker turns, using the names the meeting software recorded |
+| Word: `.docx` (Teams "Download transcript") | Text extracted and treated as a transcript |
+
+Transcripts get extra handling in the extraction prompt: Claude works out which speaker is you and which is the client, ignores small talk, and adds an open question when a name or figure may have been misheard.
+
+```bash
+# Just the transcript
+sales-copilot transcribe call.m4a -o call-transcript.txt
+
+# Name the speakers so the record and email use real names
+sales-copilot notes call.m4a --speakers "Speaker 1=Sox,Speaker 2=Thandi Mokoena"
+
+# Treat a pasted transcript text file as a transcript
+sales-copilot notes transcript.txt --transcript
+```
+
+**Choosing a transcription service** (`TRANSCRIBE_PROVIDER`):
+
+| | Deepgram (default) | OpenAI |
+|---|---|---|
+| Key | `DEEPGRAM_API_KEY` | `OPENAI_API_KEY` |
+| Model | `nova-3` (`DEEPGRAM_MODEL`) | `gpt-4o-transcribe-diarize` (`OPENAI_TRANSCRIBE_MODEL`) |
+| Speaker labels | Yes | Yes, with the diarize model |
+| File size | Large files fine | 25 MB per file. Compress first: `ffmpeg -i in.m4a -ac 1 -b:a 32k out.mp3` |
+| Language | `DEEPGRAM_LANGUAGE=en`, or `detect` | Detected automatically |
+
+Speech-to-text is the only step that does not use Claude, because Claude does not accept audio input. Recordings are sent to the provider you choose.
 
 ## 1. Call notes to CRM
 
@@ -133,6 +172,15 @@ Returns `{ extraction, crm }`, where `crm` lists every action taken and any warn
 ```
 Pass `notes` instead of `extraction` to extract and draft in one call. Returns `{ extraction, drafts, eml }`.
 
+`POST /api/transcribe?filename=call.m4a&notes=1&followup=1`
+Send the recording as the raw request body with its `Content-Type` (for example `audio/mp4`), up to 200 MB. Optional query parameters: `speakers` (`Speaker 1=Sox,Speaker 2=Thandi`), `crm`, `dryRun=1`, `meetingDate`, `tone`. Returns `{ transcript, segments }`, plus `extraction` and `crm` with `notes=1`, and `drafts` and `eml` with `followup=1`.
+```bash
+curl -X POST "https://your-app/api/transcribe?filename=call.m4a&notes=1&followup=1" \
+  -H "Authorization: Bearer $APP_API_KEY" -H "Content-Type: audio/mp4" --data-binary @call.m4a
+```
+
+`/api/notes` and `/api/followup` also accept `"transcript": true` when the text you send is a transcript.
+
 `GET /health` returns `{ "ok": true }`.
 
 ### Deploying on Railway
@@ -150,6 +198,7 @@ src/
   crm/               Twenty, HubSpot, file and no-op adapters behind one interface
   followup/draft.ts  Drafting prompt, .eml and markdown output
   followup/style.ts  Style profile parsing and the em dash / contraction guard
+  transcribe/        Deepgram and OpenAI speech-to-text, .vtt/.srt/.docx parsing, input detection
   pipeline.ts        Shared flow used by the CLI and the server
   cli.ts, server.ts
 test/                Vitest suite with a fake LLM and mocked CRM APIs (no network needed)
@@ -158,7 +207,7 @@ test/                Vitest suite with a fake LLM and mocked CRM APIs (no networ
 ## Development
 
 ```bash
-npm test          # 27 tests, no API keys needed
+npm test          # 41 tests, no API keys needed
 npm run typecheck
 ```
 
@@ -166,7 +215,7 @@ Adding another CRM means implementing `CrmAdapter.push()` in `src/crm/` and regi
 
 ## Privacy
 
-Call notes are sent to the Anthropic API for processing. Nothing is stored by this tool other than the files it writes to `OUT_DIR` and the records it writes to your CRM. Keep `.env` out of version control (it is in `.gitignore`).
+Call notes and transcripts are sent to the Anthropic API for processing, and recordings to your chosen transcription provider. Make sure everyone on a call knows it is being recorded and transcribed. Nothing is stored by this tool other than the files it writes to `OUT_DIR` and the records it writes to your CRM. Keep `.env` out of version control (it is in `.gitignore`).
 
 ## Licence
 
