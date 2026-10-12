@@ -4,7 +4,7 @@ import { basename, extname, join } from "node:path";
 import { Command, Option } from "commander";
 import { getConfig, loadDotEnv, type AppConfig, type CrmName } from "./config.js";
 import { slugify } from "./crm/file.js";
-import { toEml, toMarkdown, type Tone } from "./followup/draft.js";
+import { toEml, toMarkdown, toPlainText, type Tone } from "./followup/draft.js";
 import { AnthropicLlm } from "./llm.js";
 import { renderNoteMarkdown, noteTitle } from "./notes/render.js";
 import { followUp, notesToCrm } from "./pipeline.js";
@@ -191,9 +191,12 @@ function writeDrafts(outDir: string, name: string, drafts: Parameters<typeof toM
   writeFileSync(md, toMarkdown(drafts) + "\n");
   const written = [md];
   drafts.forEach((d, i) => {
-    const eml = join(outDir, `${base}${drafts.length > 1 ? `-${i + 1}` : ""}.eml`);
+    const name = `${base}${drafts.length > 1 ? `-${i + 1}` : ""}`;
+    const eml = join(outDir, `${name}.eml`);
+    const txt = join(outDir, `${name}.txt`);
     writeFileSync(eml, toEml(d, from));
-    written.push(eml);
+    writeFileSync(txt, toPlainText(d));
+    written.push(eml, txt);
   });
   console.log(`Saved: ${written.join(", ")}`);
 }

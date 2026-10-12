@@ -134,6 +134,11 @@ export function toEml(draft: FollowUpDraft, from?: string): string {
   return `${headers.join("\r\n")}\r\n\r\n${draft.body.replace(/\r?\n/g, "\r\n")}\r\n`;
 }
 
+/** Plain text email for .txt export. */
+export function toPlainText(draft: FollowUpDraft): string {
+  return `${draft.to ? `To: ${draft.to}\n` : ""}Subject: ${draft.subject}\n\n${draft.body}\n`;
+}
+
 export function toMarkdown(drafts: FollowUpDraft[]): string {
   return drafts
     .map(

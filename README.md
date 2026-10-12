@@ -91,7 +91,7 @@ cat notes.txt | sales-copilot notes          # stdin works too
 
 | | Twenty | HubSpot | file |
 |---|---|---|---|
-| Note | `notes` with markdown body (`bodyV2`) | `notes` with HTML body | `out/<date>-<company>.md` |
+| Note | `notes` with markdown body (`bodyV2`) | `notes` with HTML body | `out/<date>-<company>.md` and `.txt` |
 | Links | `noteTargets` / `taskTargets` to company, people (by email), opportunity | HubSpot-defined associations to company, contacts, deal | |
 | Tasks | One per next step we own, with due date | One per next step, with priority | Listed in the output |
 | Stage | `PATCH opportunities/{id}` `stage` | `PATCH deals/{id}` `dealstage` | |
@@ -131,7 +131,7 @@ sales-copilot followup --from-json out/2026-10-12-kestrel-foods.json   # reuse a
 | `--style <file>` | Your style profile (see below) |
 | `--no-save` | Print only |
 
-Drafts are saved to `OUT_DIR` as a markdown file plus one `.eml` per draft. Double-click an `.eml` to open it as an unsent draft in Outlook, Apple Mail or Thunderbird.
+Drafts are saved to `OUT_DIR` as a markdown file plus one `.eml` and one `.txt` per draft. Double-click an `.eml` to open it as an unsent draft in Outlook, Apple Mail or Thunderbird.
 
 ### Making it sound like you
 
@@ -207,7 +207,7 @@ test/                Vitest suite with a fake LLM and mocked CRM APIs (no networ
 ## Development
 
 ```bash
-npm test          # 41 tests, no API keys needed
+npm test          # 42 tests, no API keys needed
 npm run typecheck
 ```
 

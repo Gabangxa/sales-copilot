@@ -69,6 +69,17 @@ export function renderNoteMarkdown(x: CallExtraction): string {
   return out.join("\n\n");
 }
 
+/** Plain text version of the note for .txt export: no markdown symbols, headings in capitals. */
+export function noteToPlainText(x: CallExtraction): string {
+  const title = noteTitle(x);
+  const body = renderNoteMarkdown(x)
+    .replace(/^## (.+)$/gm, (_m, t: string) => t.toUpperCase())
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|\s)_(.+?)_(?=\s|$)/g, "$1$2")
+    .replace(/ {2}$/gm, "");
+  return `${title}\n${"=".repeat(Math.min(title.length, 72))}\n\n${body}\n`;
+}
+
 /** Very small markdown to HTML conversion for CRMs (HubSpot) that store notes as HTML. */
 export function markdownToSimpleHtml(md: string): string {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

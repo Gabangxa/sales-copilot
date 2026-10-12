@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CallExtraction } from "../schema.js";
-import { formatNextStep, noteTitle, renderNoteMarkdown } from "../notes/render.js";
+import { formatNextStep, noteTitle, noteToPlainText, renderNoteMarkdown } from "../notes/render.js";
 import { tasksToCreate, type CrmAdapter, type PushOptions, type PushResult } from "./types.js";
 
 export function slugify(s: string): string {
@@ -32,7 +32,11 @@ export class FileAdapter implements CrmAdapter {
       actions: [],
       files: [],
     };
-    const files = { [`${base}.md`]: md, [`${base}.json`]: JSON.stringify(x, null, 2) + "\n" };
+    const files = {
+      [`${base}.md`]: md,
+      [`${base}.txt`]: noteToPlainText(x),
+      [`${base}.json`]: JSON.stringify(x, null, 2) + "\n",
+    };
     if (opts.dryRun) {
       result.actions.push(...Object.keys(files).map((f) => `[dry run] Write ${join(this.outDir, f)}`));
     } else {

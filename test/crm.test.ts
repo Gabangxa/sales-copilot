@@ -95,10 +95,14 @@ describe("HubSpotAdapter", () => {
 });
 
 describe("FileAdapter", () => {
-  it("writes markdown and JSON", async () => {
+  it("writes markdown, plain text and JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sc-"));
     const r = await new FileAdapter(dir).push(sampleExtraction);
-    expect(r.files).toHaveLength(2);
+    expect(r.files).toHaveLength(3);
+    const txt = readFileSync(join(dir, "2026-10-12-kestrel-foods.txt"), "utf8");
+    expect(txt).toMatch(/^Discovery call: Kestrel Foods treasury \(2026-10-12\)\n=+\n/);
+    expect(txt).toContain("\nNEXT STEPS\n- Send indicative USD/ZAR");
+    expect(txt).not.toMatch(/\*\*|##/);
     const json = JSON.parse(readFileSync(join(dir, "2026-10-12-kestrel-foods.json"), "utf8"));
     expect(json.account.companyName).toBe("Kestrel Foods");
   });

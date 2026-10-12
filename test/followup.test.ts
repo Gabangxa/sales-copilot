@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDraftPrompt, draftFollowUp, toEml } from "../src/followup/draft.js";
+import { buildDraftPrompt, draftFollowUp, toEml, toPlainText } from "../src/followup/draft.js";
 import { applyStyleRules, expandContractions, loadStyleProfile, parseStyleProfile, removeEmDashes } from "../src/followup/style.js";
 import { FakeLlm, sampleExtraction } from "./fixtures.js";
 
@@ -78,6 +78,11 @@ describe("draftFollowUp", () => {
   it("clamps variants to 1..3", () => {
     expect(buildDraftPrompt(sampleExtraction, strictProfile, { variants: 9 })).toContain("Write 3 drafts");
     expect(buildDraftPrompt(sampleExtraction, strictProfile, { variants: 0 })).toContain("Write 1 draft ");
+  });
+
+  it("renders a .txt draft", () => {
+    const txt = toPlainText({ label: "x", subject: "Hello", body: "Hi Thandi,\n\nThanks.", to: "a@b.example", style: {} as any });
+    expect(txt).toBe("To: a@b.example\nSubject: Hello\n\nHi Thandi,\n\nThanks.\n");
   });
 
   it("renders an .eml draft", () => {
