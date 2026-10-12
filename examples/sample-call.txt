@@ -1,0 +1,17 @@
+Call with Kestrel Foods (fictional example) - Mon 12 Oct 2026, Teams, 45 min
+Attendees: Thandi Mokoena (Group Treasurer, Kestrel Foods, thandi.mokoena@kestrelfoods.example), Pieter Venter (Head of Procurement), me (Sox)
+
+- They import packaging and wheat, mostly paying USD and EUR. About USD 3-4m a month, EUR 1m.
+- Currently all FX through their main bank. Main complaint is not pricing but settlement delays, 2-3 days on EUR payments, and nobody to call when it goes wrong.
+- Thandi wants better visibility on rates vs what the bank gives them. Asked if we can show TCA / benchmark against mid.
+- Pieter worried about onboarding a new counterparty, last time it took 4 months with KYC.
+- Objection: "we have a credit line with the bank, why would we move?" I explained we do not need to replace the bank, can run alongside for spot and see the difference. Thandi seemed open, Pieter less so.
+- Interested in forwards for 3 months on USD/ZAR to hedge the wheat contracts. Want indicative pricing.
+- Decision: Thandi recommends, CFO (Johan Smit) signs off. Board approval not needed under ZAR 50m.
+- Timing: want something in place before the January wheat contracts.
+
+Next steps
+- I send indicative USD/ZAR forward pricing 1m and 3m by Thursday
+- I send KYC checklist and onboarding timeline today
+- Thandi to share last quarter's trade blotter so we can do a TCA comparison, end of next week
+- Book a session with Johan (CFO) in two weeks
